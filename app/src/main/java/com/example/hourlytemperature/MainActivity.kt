@@ -6,15 +6,22 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.location.Location
+import android.os.Build
+import android.util.Log
 //import android.util.Log
 import android.widget.TextView
+import android.widget.Toast
+import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
 import com.google.android.gms.location.FusedLocationProviderClient
-//import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.LocationServices
 import java.text.SimpleDateFormat
 import java.util.*
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
 
-
+@Suppress("DEPRECATION")
 class MainActivity : AppCompatActivity() {
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private val LOCATION_PERMISSION_REQUEST_CODE = 1
@@ -22,18 +29,13 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        if (ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
-        ) {
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+
+        // Check location permission
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             getLastKnownLocation()
         } else {
-            ActivityCompat.requestPermissions(
-                this,
-                arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION),
-                1
-            )
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION), 1)
         }
     }
 
@@ -48,17 +50,21 @@ class MainActivity : AppCompatActivity() {
                     getHourlyWeatherData(latitude, longitude)
                 }
             }
+            .addOnFailureListener {
+                Toast.makeText(this,"Failure", Toast.LENGTH_SHORT).show()
+            }
     }
     private fun getHourlyWeatherData(latitude: Double, longitude: Double) {
         val apiKey = "62fa0f3f1d8105534a3605af3bf67cae" // Replace with your actual API key
         val weatherApiClient = WeatherApiClient()
         val weatherService = weatherApiClient.getWeatherService()
 
-        val call = weatherService.getHourlyWeather(latitude, longitude, apiKey)
-        call.enqueue(object : retrofit2.Callback<HourlyWeatherResponse> {
+        val call = weatherService.getHourlyWeather(latitude, longitude, "current,minutely,daily,alerts" , apiKey)
+        call.enqueue(object : Callback<HourlyWeatherResponse> {
+            @RequiresApi(Build.VERSION_CODES.O)
             override fun onResponse(
-                call: retrofit2.Call<HourlyWeatherResponse>,
-                response: retrofit2.Response<HourlyWeatherResponse>
+                call: Call<HourlyWeatherResponse>,
+                response: Response<HourlyWeatherResponse>
             ) {
                 if (response.isSuccessful) {
                     val hourlyWeatherResponse = response.body()
@@ -66,10 +72,12 @@ class MainActivity : AppCompatActivity() {
                     hourlyWeatherResponse?.let {
                         val hourlyWeatherList = hourlyWeatherResponse.hourly
                         // Update UI with hourly weather details
-//                        val zerotym = findViewById<TextView>(R.id.zerotym)
-//                        zerotym.text= hourlyWeatherList.toString()
-                        val zerotemp = findViewById<TextView>(R.id.zerotemp)
-                        zerotemp.text = hourlyWeatherList.toString()
+                        if(hourlyWeatherList != null && hourlyWeatherList.isNotEmpty()){
+                            val zerotemp = findViewById<TextView>(R.id.zerotemp)
+                            zerotemp.text = hourlyWeatherList.toString()
+                        }else{
+                            Log.e("this","error")
+                        }
 
                         val day = findViewById<TextView>(R.id.day)
                         val date = findViewById<TextView>(R.id.date)
@@ -85,10 +93,11 @@ class MainActivity : AppCompatActivity() {
                     }
                 } else {
                     // Handle API error
+                    Toast.makeText(this@MainActivity,"Error",Toast.LENGTH_SHORT).show()
                 }
             }
 
-            override fun onFailure(call: retrofit2.Call<HourlyWeatherResponse>, t: Throwable) {
+            override fun onFailure(call: Call<HourlyWeatherResponse>, t: Throwable) {
                 // Handle network failure or request cancellation
             }
         })
@@ -109,10 +118,14 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     // Permission denied, handle accordingly (e.g., show a message, disable functionality)
                     // ...
+                    Log.d("TAG", "Debug log message");
+                    Log.e("TAG", "Error log message");
+                    Log.i("TAG", "Information log message");
                 }
             }
         }
     }
 }
+
 
 
